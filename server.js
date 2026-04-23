@@ -6,31 +6,33 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve seus arquivos HTML
+// Servir arquivos
 app.use(express.static(__dirname));
 
-// Multiplayer básico
+// Jogadores
 let players = {};
 
 io.on("connection", (socket) => {
   console.log("Jogador conectado:", socket.id);
 
-  players[socket.id] = { x: 100, y: 100 };
+  players[socket.id] = {
+    x: Math.random() * 500,
+    y: Math.random() * 500
+  };
 
   socket.emit("currentPlayers", players);
 
   socket.broadcast.emit("newPlayer", {
     id: socket.id,
-    x: 100,
-    y: 100,
+    ...players[socket.id]
   });
 
   socket.on("move", (data) => {
     players[socket.id] = data;
+
     socket.broadcast.emit("playerMoved", {
       id: socket.id,
-      x: data.x,
-      y: data.y,
+      ...data
     });
   });
 
@@ -40,7 +42,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// IMPORTANTE pro Railway
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log("Servidor rodando na porta", PORT);
