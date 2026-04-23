@@ -1,74 +1,63 @@
-let usuario = localStorage.getItem("user") || "";
-let salas = JSON.parse(localStorage.getItem("salas")) || [];
-let ranking = JSON.parse(localStorage.getItem("ranking")) || [];
+const socket = io();
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-if (usuario) iniciar();
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-function entrar() {
-  let nome = document.getElementById("nome").value;
-  if (!nome) return alert("Digite um nome");
+let players = {};
+let myId = null;
 
-  localStorage.setItem("user", nome);
-  usuario = nome;
+// Recebe jogadores
+socket.on("currentPlayers", (data) => {
+  players = data;
+});
 
-  iniciar();
-}
+socket.on("newPlayer", (player) => {
+  players[player.id] = player;
+});
 
-function iniciar() {
-  document.getElementById("login").style.display = "none";
-  document.getElementById("app").classList.remove("hidden");
+socket.on("playerMoved", (player) => {
+  if (players[player.id]) {
+    players[player.id].x = player.x;
+    players[player.id].y = player.y;
+  }
+});
 
-  document.getElementById("boasVindas").innerText =
-    "Bem-vindo, " + usuario;
+socket.on("playerDisconnected", (id) => {
+  delete players[id];
+});
 
-  atualizarSalas();
-  atualizarRanking();
-}
+socket.on("connect", () => {
+  myId = socket.id;
+});
 
-function criarSala() {
-  let sala = "Sala " + (salas.length + 1);
-  salas.push(sala);
-  localStorage.setItem("salas", JSON.stringify(salas));
-  atualizarSalas();
-}
+// Movimento
+document.addEventListener("mousemove", (e) => {
+  if (!myId) return;
 
-function atualizarSalas() {
-  let lista = document.getElementById("salas");
-  lista.innerHTML = "";
+  players[myId] = {
+    x: e.clientX,
+    y: e.clientY
+  };
 
-  salas.forEach(s => {
-    let li = document.createElement("li");
-    li.innerHTML = `${s} <button onclick="entrarSala('${s}')">Entrar</button>`;
-    lista.appendChild(li);
-  });
-}
+  socket.emit("move", players[myId]);
+});
 
-function entrarSala(sala) {
-  alert("Entrou na " + sala);
-}
+// Render
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-function ganharPontos() {
-  let player = ranking.find(p => p.nome === usuario);
+  for (let id in players) {
+    const p = players[id];
 
-  if (!player) {
-    ranking.push({ nome: usuario, pontos: 10 });
-  } else {
-    player.pontos += 10;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = id === myId ? "lime" : "red";
+    ctx.fill();
   }
 
-  localStorage.setItem("ranking", JSON.stringify(ranking));
-  atualizarRanking();
+  requestAnimationFrame(draw);
 }
 
-function atualizarRanking() {
-  let lista = document.getElementById("ranking");
-  lista.innerHTML = "";
-
-  ranking
-    .sort((a, b) => b.pontos - a.pontos)
-    .forEach(p => {
-      let li = document.createElement("li");
-      li.innerText = `${p.nome} - ${p.pontos} pts`;
-      lista.appendChild(li);
-    });
-}
+draw();
