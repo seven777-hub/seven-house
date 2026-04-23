@@ -1,44 +1,18 @@
-<!DOCTYPE html>
-<html lang="pt-br">
+<!DOCT<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="UTF-8">
   <title>Seven House</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    body { margin:0; overflow:hidden; background:#111; }
+    canvas { display:block; }
+  </style>
 </head>
 <body>
 
-<div class="container">
+<canvas id="game"></canvas>
 
-  <h1>🎮 Seven House</h1>
-
-  <div id="login">
-    <input type="text" id="nome" placeholder="Seu nome">
-    <button onclick="entrar()">Entrar</button>
-  </div>
-
-  <div id="app" class="hidden">
-
-    <h2 id="boasVindas"></h2>
-
-    <div class="botoes">
-      <button onclick="criarSala()">➕ Criar Sala</button>
-      <button onclick="ganharPontos()">🏆 +10 pontos</button>
-    </div>
-
-    <div class="box">
-      <h3>Salas</h3>
-      <ul id="salas"></ul>
-    </div>
-
-    <div class="box">
-      <h3>Ranking</h3>
-      <ul id="ranking"></ul>
-    </div>
-
-  </div>
-
-</div>
-
+<script src="/socket.io/socket.io.js"></script>
 <script src="script.js"></script>
+
 </body>
 </html>
