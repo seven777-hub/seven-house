@@ -9,6 +9,11 @@ const io = new Server(server);
 // Servir arquivos
 app.use(express.static(__dirname));
 
+// 👇 GARANTE QUE O INDEX ABRA
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/index.html");
+});
+
 // Jogadores
 let players = {};
 
