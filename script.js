@@ -5,8 +5,8 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 // ===== CONFIG =====
-const SAFE_RADIUS = 150;
 const SMOOTH = 0.12;
+const SAFE_RADIUS = 150;
 
 let snake = [];
 let maxLength = 30;
@@ -19,10 +19,9 @@ let head = {
 let target = { x: head.x, y: head.y };
 
 let foods = [];
-let boosting = false;
 
 // ===== CRIAR COMIDA =====
-for (let i = 0; i < 50; i++) {
+for (let i = 0; i < 100; i++) {
   foods.push({
     x: Math.random() * canvas.width,
     y: Math.random() * canvas.height
@@ -41,18 +40,12 @@ document.addEventListener("touchmove", (e) => {
   target.y = t.clientY;
 }, { passive: true });
 
-document.addEventListener("touchstart", () => boosting = true);
-document.addEventListener("touchend", () => boosting = false);
-
 // ===== UPDATE =====
 function update() {
 
-  let speed = boosting ? 0.25 : SMOOTH;
+  head.x += (target.x - head.x) * SMOOTH;
+  head.y += (target.y - head.y) * SMOOTH;
 
-  head.x += (target.x - head.x) * speed;
-  head.y += (target.y - head.y) * speed;
-
-  // OTIMIZAÇÃO (não criar ponto toda hora)
   if (!snake[0] || Math.hypot(head.x - snake[0].x, head.y - snake[0].y) > 4) {
     snake.unshift({ x: head.x, y: head.y });
   }
@@ -67,9 +60,9 @@ function update() {
     const dy = head.y - food.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist < 12) {
+    if (dist < 10) {
       foods.splice(index, 1);
-      maxLength += 6;
+      maxLength += 4;
 
       foods.push({
         x: Math.random() * canvas.width,
@@ -78,32 +71,23 @@ function update() {
     }
   });
 
-  // GÁS (fora da safe zone)
+  // GÁS
   const dx = head.x - canvas.width/2;
   const dy = head.y - canvas.height/2;
   const dist = Math.sqrt(dx*dx + dy*dy);
 
   if (dist > SAFE_RADIUS) {
-    maxLength -= 0.2;
-
-    if (maxLength < 10) {
-      maxLength = 10;
-    }
+    maxLength -= 0.1;
+    if (maxLength < 10) maxLength = 10;
   }
 
-  // BOOST consome tamanho
-  if (boosting) {
-    maxLength -= 0.3;
-  }
-
-  // COLISÃO COM PRÓPRIO CORPO
+  // COLISÃO
   for (let i = 10; i < snake.length; i++) {
     const s = snake[i];
     const dx = head.x - s.x;
     const dy = head.y - s.y;
 
-    if (Math.sqrt(dx*dx + dy*dy) < 8) {
-      // morreu
+    if (Math.sqrt(dx*dx + dy*dy) < 7) {
       maxLength = 30;
       snake = [];
     }
@@ -113,32 +97,51 @@ function update() {
 // ===== DESENHO =====
 function draw() {
 
-  ctx.fillStyle = "#0b0b0f";
+  // fundo com fade (efeito movimento)
+  ctx.fillStyle = "rgba(10,10,10,0.45)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   update();
 
+  // GRID
+  ctx.strokeStyle = "rgba(255,255,255,0.025)";
+  ctx.lineWidth = 1;
+
+  for (let x = 0; x < canvas.width; x += 40) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+
+  for (let y = 0; y < canvas.height; y += 40) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
   // SAFE ZONE
   ctx.beginPath();
   ctx.arc(canvas.width/2, canvas.height/2, SAFE_RADIUS, 0, Math.PI*2);
-  ctx.strokeStyle = "rgba(0,255,150,0.3)";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(0,255,150,0.15)";
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  // COMIDA COM ANIMAÇÃO
-  const time = Date.now() * 0.005;
+  // COMIDA
+  const time = Date.now() * 0.004;
 
   foods.forEach(food => {
-    const pulse = Math.sin(time + food.x) * 2;
+    const pulse = Math.sin(time + food.x) * 1.5;
 
     ctx.beginPath();
     ctx.arc(food.x, food.y, 6 + pulse, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff3a0";
+    ctx.fillStyle = "rgba(255,230,120,0.15)";
     ctx.fill();
 
     ctx.beginPath();
-    ctx.arc(food.x, food.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffe066";
+    ctx.arc(food.x, food.y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffd84d";
     ctx.fill();
   });
 
@@ -146,45 +149,42 @@ function draw() {
   for (let i = snake.length - 1; i >= 0; i--) {
     const s = snake[i];
 
-    let size = 10 - i * 0.03;
-    if (size < 5) size = 5;
+    let size = 8 - i * 0.02;
+    if (size < 3.5) size = 3.5;
 
-    // sombra
+    // glow leve
     ctx.beginPath();
-    ctx.arc(s.x, s.y, size + 6, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.arc(s.x, s.y, size + 4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,255,150,0.04)";
     ctx.fill();
 
-    // cor
-    const g = ctx.createRadialGradient(
-      s.x - 3, s.y - 3, 1,
-      s.x, s.y, size
-    );
-    g.addColorStop(0, "#9effff");
-    g.addColorStop(1, "#00c97a");
-
+    // corpo
     ctx.beginPath();
     ctx.arc(s.x, s.y, size, 0, Math.PI * 2);
-    ctx.fillStyle = g;
+    ctx.fillStyle = "#00c97a";
     ctx.fill();
   }
+
+  // DIREÇÃO DA CABEÇA
+  const angle = Math.atan2(target.y - head.y, target.x - head.x);
 
   // OLHOS
-  const h = snake[0];
+  const eyeOffsetX = Math.cos(angle) * 3;
+  const eyeOffsetY = Math.sin(angle) * 3;
 
-  if (h) {
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    ctx.arc(h.x - 4, h.y - 4, 3, 0, Math.PI * 2);
-    ctx.arc(h.x + 4, h.y - 4, 3, 0, Math.PI * 2);
-    ctx.fill();
+  ctx.fillStyle = "white";
 
-    ctx.fillStyle = "black";
-    ctx.beginPath();
-    ctx.arc(h.x - 4, h.y - 4, 1.5, 0, Math.PI * 2);
-    ctx.arc(h.x + 4, h.y - 4, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.beginPath();
+  ctx.arc(head.x - 4 + eyeOffsetX, head.y - 3 + eyeOffsetY, 2.8, 0, Math.PI * 2);
+  ctx.arc(head.x + 4 + eyeOffsetX, head.y - 3 + eyeOffsetY, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "black";
+
+  ctx.beginPath();
+  ctx.arc(head.x - 4 + eyeOffsetX, head.y - 3 + eyeOffsetY, 1.3, 0, Math.PI * 2);
+  ctx.arc(head.x + 4 + eyeOffsetX, head.y - 3 + eyeOffsetY, 1.3, 0, Math.PI * 2);
+  ctx.fill();
 
   // GÁS VISUAL
   const dx = head.x - canvas.width/2;
@@ -192,7 +192,7 @@ function draw() {
   const dist = Math.sqrt(dx*dx + dy*dy);
 
   if (dist > SAFE_RADIUS) {
-    ctx.fillStyle = "rgba(0,255,100,0.08)";
+    ctx.fillStyle = "rgba(0,255,120,0.05)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
