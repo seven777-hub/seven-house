@@ -60,13 +60,8 @@ document.addEventListener("mousemove", (e) => {
 
 // ===== MORTE =====
 function die() {
+  snake.forEach(s => foods.push({ x: s.x, y: s.y }));
 
-  // vira comida
-  snake.forEach(s => {
-    foods.push({ x: s.x, y: s.y });
-  });
-
-  // reset
   snake = [];
   maxLength = 30;
   head.x = 0;
@@ -86,17 +81,9 @@ function update() {
   if (gameTime <= 30) shrinking = true;
 
   // SAFE
-  if (shrinking && safeRadius > MIN_SAFE) {
-    safeRadius -= SAFE_SPEED;
-  }
-
-  if (!shrinking && safeRadius < MAP_SIZE/2) {
-    safeRadius += SAFE_SPEED;
-  }
-
-  if (safeRadius <= MIN_SAFE) {
-    shrinking = false;
-  }
+  if (shrinking && safeRadius > MIN_SAFE) safeRadius -= SAFE_SPEED;
+  if (!shrinking && safeRadius < MAP_SIZE/2) safeRadius += SAFE_SPEED;
+  if (safeRadius <= MIN_SAFE) shrinking = false;
 
   // DIREÇÃO
   let targetAngle = Math.atan2(target.y, target.x);
@@ -107,23 +94,22 @@ function update() {
 
   head.angle += diff * TURN_SPEED;
 
-  // VELOCIDADE
-  let currentSpeed = boosting ? BOOST_SPEED : SPEED;
+  // VERIFICA SE PODE BOOST
+  let canBoost = maxLength > 20;
+
+  let currentSpeed = (boosting && canBoost) ? BOOST_SPEED : SPEED;
 
   head.x += Math.cos(head.angle) * currentSpeed;
   head.y += Math.sin(head.angle) * currentSpeed;
 
-  // BOOST GASTA TAMANHO
-  if (boosting) {
-    maxLength -= 0.25;
-    if (maxLength < 15) maxLength = 15;
+  // BOOST CUSTO REAL
+  if (boosting && canBoost) {
+    maxLength -= 0.3;
 
-    // drop de comida
-    if (Math.random() < 0.3) {
+    // solta comida
+    if (Math.random() < 0.4) {
       let tail = snake[snake.length - 1];
-      if (tail) {
-        foods.push({ x: tail.x, y: tail.y });
-      }
+      if (tail) foods.push({ x: tail.x, y: tail.y });
     }
   }
 
@@ -147,17 +133,23 @@ function update() {
     }
   });
 
-  // GÁS MATA
+  // ===== GÁS (CORRIGIDO) =====
   if (Math.hypot(head.x, head.y) > safeRadius) {
-    maxLength -= 0.4;
-    if (maxLength <= 10) die();
+
+    // gás ignora boost → sempre perde forte
+    maxLength -= 0.8;
+
+    if (maxLength <= 10) {
+      die();
+      return;
+    }
   }
 
   // COLISÃO
   for (let i = 20; i < snake.length; i++) {
     if (Math.hypot(head.x - snake[i].x, head.y - snake[i].y) < 8) {
       die();
-      break;
+      return;
     }
   }
 
@@ -231,27 +223,32 @@ function draw() {
     ctx.lineWidth = thickness;
     ctx.strokeStyle="#00c97a";
     ctx.stroke();
+
+    // ===== PONTA ARDENDO =====
+    if (boosting && maxLength > 20) {
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, thickness + 6, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(255,120,0,0.5)";
+      ctx.fill();
+    }
   }
 
   ctx.restore();
 
-  // OLHOS
+  // ===== OLHOS CENTRALIZADOS =====
   const cx = canvas.width/2;
   const cy = canvas.height/2;
 
-  const ex = Math.cos(head.angle)*6;
-  const ey = Math.sin(head.angle)*6;
-
   ctx.fillStyle="white";
   ctx.beginPath();
-  ctx.arc(cx-6+ex, cy-4+ey, 3,0,Math.PI*2);
-  ctx.arc(cx+6+ex, cy-4+ey, 3,0,Math.PI*2);
+  ctx.arc(cx-6, cy-4, 3,0,Math.PI*2);
+  ctx.arc(cx+6, cy-4, 3,0,Math.PI*2);
   ctx.fill();
 
   ctx.fillStyle="black";
   ctx.beginPath();
-  ctx.arc(cx-6+ex, cy-4+ey, 1.5,0,Math.PI*2);
-  ctx.arc(cx+6+ex, cy-4+ey, 1.5,0,Math.PI*2);
+  ctx.arc(cx-6, cy-4, 1.5,0,Math.PI*2);
+  ctx.arc(cx+6, cy-4, 1.5,0,Math.PI*2);
   ctx.fill();
 
   // UI
