@@ -4,27 +4,22 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// CONFIG
-const SMOOTH = 0.12;
-
-let MAP_RADIUS = Math.max(canvas.width, canvas.height);
-let safeRadius = MAP_RADIUS;
-const MIN_SAFE = 100;
-const SAFE_SPEED = 0.08;
+// ===== CONFIG =====
+const SPEED = 2.2;
+const TURN_SPEED = 0.08;
 
 let snake = [];
-let maxLength = 80;
+let maxLength = 30;
 
 let head = {
   x: canvas.width / 2,
-  y: canvas.height / 2
+  y: canvas.height / 2,
+  angle: 0
 };
 
 let target = { x: head.x, y: head.y };
 
-let foods = [];
-
-// ===== TEXTURA DINÂMICA =====
+// ===== TEXTURA =====
 const texCanvas = document.createElement("canvas");
 texCanvas.width = 40;
 texCanvas.height = 40;
@@ -42,15 +37,16 @@ tctx.stroke();
 
 let textureOffset = 0;
 
-// COMIDA
-for (let i = 0; i < 120; i++) {
+// ===== COMIDA =====
+let foods = [];
+for (let i = 0; i < 80; i++) {
   foods.push({
     x: Math.random() * canvas.width,
     y: Math.random() * canvas.height
   });
 }
 
-// CONTROLES
+// ===== CONTROLE =====
 document.addEventListener("mousemove", (e) => {
   target.x = e.clientX;
   target.y = e.clientY;
@@ -62,13 +58,26 @@ document.addEventListener("touchmove", (e) => {
   target.y = t.clientY;
 }, { passive: true });
 
-// UPDATE
+// ===== UPDATE =====
 function update() {
 
-  head.x += (target.x - head.x) * SMOOTH;
-  head.y += (target.y - head.y) * SMOOTH;
+  // direção alvo
+  let targetAngle = Math.atan2(target.y - head.y, target.x - head.x);
 
-  if (!snake[0] || Math.hypot(head.x - snake[0].x, head.y - snake[0].y) > 5) {
+  // suavizar rotação
+  let diff = targetAngle - head.angle;
+
+  if (diff > Math.PI) diff -= Math.PI * 2;
+  if (diff < -Math.PI) diff += Math.PI * 2;
+
+  head.angle += diff * TURN_SPEED;
+
+  // movimento constante
+  head.x += Math.cos(head.angle) * SPEED;
+  head.y += Math.sin(head.angle) * SPEED;
+
+  // corpo
+  if (!snake[0] || Math.hypot(head.x - snake[0].x, head.y - snake[0].y) > 4) {
     snake.unshift({ x: head.x, y: head.y });
   }
 
@@ -83,7 +92,7 @@ function update() {
 
     if (Math.sqrt(dx*dx + dy*dy) < 10) {
       foods.splice(i, 1);
-      maxLength += 5;
+      maxLength += 4;
 
       foods.push({
         x: Math.random() * canvas.width,
@@ -92,26 +101,27 @@ function update() {
     }
   });
 
-  // SAFE DIMINUINDO
-  if (safeRadius > MIN_SAFE) {
-    safeRadius -= SAFE_SPEED;
+  // ===== COLISÃO COM CORPO =====
+  for (let i = 15; i < snake.length; i++) {
+    const s = snake[i];
+
+    const dx = head.x - s.x;
+    const dy = head.y - s.y;
+
+    if (Math.sqrt(dx*dx + dy*dy) < 8) {
+      // reset
+      snake = [];
+      maxLength = 30;
+      head.x = canvas.width / 2;
+      head.y = canvas.height / 2;
+      break;
+    }
   }
 
-  // GÁS
-  const dx = head.x - canvas.width/2;
-  const dy = head.y - canvas.height/2;
-  const dist = Math.sqrt(dx*dx + dy*dy);
-
-  if (dist > safeRadius) {
-    maxLength -= 0.15;
-    if (maxLength < 15) maxLength = 15;
-  }
-
-  // mover textura
   textureOffset += 2;
 }
 
-// DESENHO
+// ===== DESENHO =====
 function draw() {
 
   ctx.fillStyle = "rgba(10,10,10,0.5)";
@@ -134,12 +144,6 @@ function draw() {
     ctx.stroke();
   }
 
-  // SAFE
-  ctx.beginPath();
-  ctx.arc(canvas.width/2, canvas.height/2, safeRadius, 0, Math.PI*2);
-  ctx.strokeStyle = safeRadius < 150 ? "rgba(255,80,80,0.4)" : "rgba(0,255,150,0.15)";
-  ctx.stroke();
-
   // COMIDA
   const time = Date.now() * 0.004;
 
@@ -147,7 +151,7 @@ function draw() {
     const pulse = Math.sin(time + food.x) * 1.5;
 
     ctx.beginPath();
-    ctx.arc(food.x, food.y, 7 + pulse, 0, Math.PI * 2);
+    ctx.arc(food.x, food.y, 6 + pulse, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255,230,120,0.15)";
     ctx.fill();
 
@@ -157,7 +161,7 @@ function draw() {
     ctx.fill();
   });
 
-  // ===== COBRA COM TEXTURA ANIMADA =====
+  // ===== COBRA =====
   if (snake.length > 2) {
 
     ctx.save();
@@ -174,17 +178,17 @@ function draw() {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // BORDA
-    ctx.lineWidth = 16;
+    let thickness = 8 + (maxLength / 50);
+
+    // borda
+    ctx.lineWidth = thickness + 6;
     ctx.strokeStyle = "#6affd2";
     ctx.stroke();
 
-    // CLIP PARA TEXTURA
+    // textura
     ctx.clip();
 
-    // mover padrão
     ctx.translate(-textureOffset, 0);
-
     const pattern = ctx.createPattern(texCanvas, "repeat");
     ctx.fillStyle = pattern;
 
@@ -193,12 +197,10 @@ function draw() {
     ctx.restore();
   }
 
-  // DIREÇÃO
-  const angle = Math.atan2(target.y - head.y, target.x - head.x);
-  const ox = Math.cos(angle) * 4;
-  const oy = Math.sin(angle) * 4;
+  // ===== OLHOS DIRECIONAIS =====
+  const ox = Math.cos(head.angle) * 4;
+  const oy = Math.sin(head.angle) * 4;
 
-  // OLHOS
   ctx.fillStyle = "white";
   ctx.beginPath();
   ctx.arc(head.x - 5 + ox, head.y - 3 + oy, 3, 0, Math.PI * 2);
