@@ -5,66 +5,56 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 // ===== CONFIG =====
-const SPEED = 2.2;
+const SPEED = 2.8;
 const TURN_SPEED = 0.08;
 
+const MAP_SIZE = 3000;
+let safeRadius = MAP_SIZE / 2;
+const SAFE_SPEED = 0.2;
+const MIN_SAFE = 200;
+
+// ===== PLAYER =====
 let snake = [];
 let maxLength = 30;
 
 let head = {
-  x: canvas.width / 2,
-  y: canvas.height / 2,
+  x: 0,
+  y: 0,
   angle: 0
 };
 
-let target = { x: head.x, y: head.y };
+let target = { x: 0, y: 0 };
 
-// ===== TEXTURA =====
-const texCanvas = document.createElement("canvas");
-texCanvas.width = 40;
-texCanvas.height = 40;
-const tctx = texCanvas.getContext("2d");
-
-tctx.fillStyle = "#00c97a";
-tctx.fillRect(0, 0, 40, 40);
-
-tctx.strokeStyle = "#6affd2";
-tctx.lineWidth = 6;
-tctx.beginPath();
-tctx.moveTo(0, 40);
-tctx.lineTo(40, 0);
-tctx.stroke();
-
-let textureOffset = 0;
+// ===== CAMERA =====
+let cam = { x: 0, y: 0 };
 
 // ===== COMIDA =====
 let foods = [];
-for (let i = 0; i < 80; i++) {
+
+for (let i = 0; i < 200; i++) {
   foods.push({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height
+    x: (Math.random() - 0.5) * MAP_SIZE,
+    y: (Math.random() - 0.5) * MAP_SIZE
   });
 }
 
 // ===== CONTROLE =====
 document.addEventListener("mousemove", (e) => {
-  target.x = e.clientX;
-  target.y = e.clientY;
+  target.x = e.clientX - canvas.width / 2;
+  target.y = e.clientY - canvas.height / 2;
 });
 
 document.addEventListener("touchmove", (e) => {
   const t = e.touches[0];
-  target.x = t.clientX;
-  target.y = t.clientY;
+  target.x = t.clientX - canvas.width / 2;
+  target.y = t.clientY - canvas.height / 2;
 }, { passive: true });
 
 // ===== UPDATE =====
 function update() {
 
-  // direção alvo
-  let targetAngle = Math.atan2(target.y - head.y, target.x - head.x);
+  let targetAngle = Math.atan2(target.y, target.x);
 
-  // suavizar rotação
   let diff = targetAngle - head.angle;
 
   if (diff > Math.PI) diff -= Math.PI * 2;
@@ -72,7 +62,6 @@ function update() {
 
   head.angle += diff * TURN_SPEED;
 
-  // movimento constante
   head.x += Math.cos(head.angle) * SPEED;
   head.y += Math.sin(head.angle) * SPEED;
 
@@ -95,76 +84,91 @@ function update() {
       maxLength += 4;
 
       foods.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height
+        x: (Math.random() - 0.5) * MAP_SIZE,
+        y: (Math.random() - 0.5) * MAP_SIZE
       });
     }
   });
 
-  // ===== COLISÃO COM CORPO =====
-  for (let i = 15; i < snake.length; i++) {
+  // ===== COLISÃO =====
+  for (let i = 20; i < snake.length; i++) {
     const s = snake[i];
 
-    const dx = head.x - s.x;
-    const dy = head.y - s.y;
-
-    if (Math.sqrt(dx*dx + dy*dy) < 8) {
-      // reset
+    if (Math.hypot(head.x - s.x, head.y - s.y) < 8) {
       snake = [];
       maxLength = 30;
-      head.x = canvas.width / 2;
-      head.y = canvas.height / 2;
+      head.x = 0;
+      head.y = 0;
       break;
     }
   }
 
-  textureOffset += 2;
+  // ===== SAFE =====
+  if (safeRadius > MIN_SAFE) {
+    safeRadius -= SAFE_SPEED;
+  }
+
+  const dist = Math.hypot(head.x, head.y);
+
+  if (dist > safeRadius) {
+    maxLength -= 0.2;
+    if (maxLength < 10) maxLength = 10;
+  }
+
+  // ===== CAMERA =====
+  cam.x += (head.x - cam.x) * 0.1;
+  cam.y += (head.y - cam.y) * 0.1;
 }
 
-// ===== DESENHO =====
+// ===== DRAW =====
 function draw() {
 
-  ctx.fillStyle = "rgba(10,10,10,0.5)";
+  ctx.fillStyle = "#0a0a0a";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   update();
 
+  ctx.save();
+
+  // câmera
+  ctx.translate(
+    canvas.width / 2 - cam.x,
+    canvas.height / 2 - cam.y
+  );
+
   // GRID
-  ctx.strokeStyle = "rgba(255,255,255,0.02)";
-  for (let x = 0; x < canvas.width; x += 40) {
+  ctx.strokeStyle = "rgba(255,255,255,0.03)";
+  for (let x = -MAP_SIZE; x <= MAP_SIZE; x += 50) {
     ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
+    ctx.moveTo(x, -MAP_SIZE);
+    ctx.lineTo(x, MAP_SIZE);
     ctx.stroke();
   }
-  for (let y = 0; y < canvas.height; y += 40) {
+
+  for (let y = -MAP_SIZE; y <= MAP_SIZE; y += 50) {
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
+    ctx.moveTo(-MAP_SIZE, y);
+    ctx.lineTo(MAP_SIZE, y);
     ctx.stroke();
   }
+
+  // SAFE ZONE
+  ctx.beginPath();
+  ctx.arc(0, 0, safeRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = safeRadius < 300 ? "rgba(255,80,80,0.4)" : "rgba(0,255,150,0.2)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
 
   // COMIDA
-  const time = Date.now() * 0.004;
-
   foods.forEach(food => {
-    const pulse = Math.sin(time + food.x) * 1.5;
-
     ctx.beginPath();
-    ctx.arc(food.x, food.y, 6 + pulse, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,230,120,0.15)";
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(food.x, food.y, 2.5, 0, Math.PI * 2);
+    ctx.arc(food.x, food.y, 4, 0, Math.PI * 2);
     ctx.fillStyle = "#ffd84d";
     ctx.fill();
   });
 
   // ===== COBRA =====
   if (snake.length > 2) {
-
-    ctx.save();
 
     ctx.beginPath();
     ctx.moveTo(snake[0].x, snake[0].y);
@@ -178,39 +182,36 @@ function draw() {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    let thickness = 8 + (maxLength / 50);
+    let thickness = 6 + (maxLength / 60);
 
-    // borda
-    ctx.lineWidth = thickness + 6;
-    ctx.strokeStyle = "#6affd2";
+    ctx.lineWidth = thickness + 4;
+    ctx.strokeStyle = "#5fffd1";
     ctx.stroke();
 
-    // textura
-    ctx.clip();
-
-    ctx.translate(-textureOffset, 0);
-    const pattern = ctx.createPattern(texCanvas, "repeat");
-    ctx.fillStyle = pattern;
-
-    ctx.fillRect(0, 0, canvas.width * 2, canvas.height * 2);
-
-    ctx.restore();
+    ctx.lineWidth = thickness;
+    ctx.strokeStyle = "#00c97a";
+    ctx.stroke();
   }
 
-  // ===== OLHOS DIRECIONAIS =====
+  ctx.restore();
+
+  // OLHOS (na tela)
+  const screenX = canvas.width / 2;
+  const screenY = canvas.height / 2;
+
   const ox = Math.cos(head.angle) * 4;
   const oy = Math.sin(head.angle) * 4;
 
   ctx.fillStyle = "white";
   ctx.beginPath();
-  ctx.arc(head.x - 5 + ox, head.y - 3 + oy, 3, 0, Math.PI * 2);
-  ctx.arc(head.x + 5 + ox, head.y - 3 + oy, 3, 0, Math.PI * 2);
+  ctx.arc(screenX - 6 + ox, screenY - 4 + oy, 3, 0, Math.PI * 2);
+  ctx.arc(screenX + 6 + ox, screenY - 4 + oy, 3, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = "black";
   ctx.beginPath();
-  ctx.arc(head.x - 5 + ox, head.y - 3 + oy, 1.5, 0, Math.PI * 2);
-  ctx.arc(head.x + 5 + ox, head.y - 3 + oy, 1.5, 0, Math.PI * 2);
+  ctx.arc(screenX - 6 + ox, screenY - 4 + oy, 1.5, 0, Math.PI * 2);
+  ctx.arc(screenX + 6 + ox, screenY - 4 + oy, 1.5, 0, Math.PI * 2);
   ctx.fill();
 
   requestAnimationFrame(draw);
