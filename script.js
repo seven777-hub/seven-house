@@ -30,6 +30,19 @@ let target = { x: 0, y: 0 };
 
 let boosting = false;
 
+// ===== DOUBLE TAP =====
+let lastTap = 0;
+
+document.addEventListener("touchstart", () => {
+  let now = Date.now();
+  if (now - lastTap < 250) {
+    boosting = true;
+  }
+  lastTap = now;
+});
+
+document.addEventListener("touchend", () => boosting = false);
+
 // ===== CAMERA =====
 let cam = { x: 0, y: 0 };
 
@@ -43,10 +56,7 @@ for (let i = 0; i < 200; i++) {
   });
 }
 
-// ===== CONTROLES =====
-document.addEventListener("touchstart", () => boosting = true);
-document.addEventListener("touchend", () => boosting = false);
-
+// ===== CONTROLE =====
 document.addEventListener("touchmove", (e) => {
   const t = e.touches[0];
   target.x = t.clientX - canvas.width/2;
@@ -61,7 +71,6 @@ document.addEventListener("mousemove", (e) => {
 // ===== MORTE =====
 function die() {
   snake.forEach(s => foods.push({ x: s.x, y: s.y }));
-
   snake = [];
   maxLength = 30;
   head.x = 0;
@@ -71,7 +80,6 @@ function die() {
 // ===== UPDATE =====
 function update() {
 
-  // TIMER
   let now = Date.now();
   if (now - lastTime > 1000) {
     gameTime--;
@@ -80,12 +88,10 @@ function update() {
 
   if (gameTime <= 30) shrinking = true;
 
-  // SAFE
   if (shrinking && safeRadius > MIN_SAFE) safeRadius -= SAFE_SPEED;
   if (!shrinking && safeRadius < MAP_SIZE/2) safeRadius += SAFE_SPEED;
   if (safeRadius <= MIN_SAFE) shrinking = false;
 
-  // DIREÇÃO
   let targetAngle = Math.atan2(target.y, target.x);
   let diff = targetAngle - head.angle;
 
@@ -94,33 +100,27 @@ function update() {
 
   head.angle += diff * TURN_SPEED;
 
-  // VERIFICA SE PODE BOOST
   let canBoost = maxLength > 20;
-
   let currentSpeed = (boosting && canBoost) ? BOOST_SPEED : SPEED;
 
   head.x += Math.cos(head.angle) * currentSpeed;
   head.y += Math.sin(head.angle) * currentSpeed;
 
-  // BOOST CUSTO REAL
   if (boosting && canBoost) {
     maxLength -= 0.3;
 
-    // solta comida
     if (Math.random() < 0.4) {
       let tail = snake[snake.length - 1];
       if (tail) foods.push({ x: tail.x, y: tail.y });
     }
   }
 
-  // CORPO
   if (!snake[0] || Math.hypot(head.x - snake[0].x, head.y - snake[0].y) > 4) {
     snake.unshift({ x: head.x, y: head.y });
   }
 
   while (snake.length > maxLength) snake.pop();
 
-  // COMER
   foods.forEach((food, i) => {
     if (Math.hypot(head.x - food.x, head.y - food.y) < 10) {
       foods.splice(i,1);
@@ -133,19 +133,14 @@ function update() {
     }
   });
 
-  // ===== GÁS (CORRIGIDO) =====
   if (Math.hypot(head.x, head.y) > safeRadius) {
-
-    // gás ignora boost → sempre perde forte
     maxLength -= 0.8;
-
     if (maxLength <= 10) {
       die();
       return;
     }
   }
 
-  // COLISÃO
   for (let i = 20; i < snake.length; i++) {
     if (Math.hypot(head.x - snake[i].x, head.y - snake[i].y) < 8) {
       die();
@@ -153,7 +148,6 @@ function update() {
     }
   }
 
-  // CAMERA
   cam.x += (head.x - cam.x) * 0.1;
   cam.y += (head.y - cam.y) * 0.1;
 }
@@ -224,32 +218,44 @@ function draw() {
     ctx.strokeStyle="#00c97a";
     ctx.stroke();
 
-    // ===== PONTA ARDENDO =====
+    // ponta ardendo
     if (boosting && maxLength > 20) {
       ctx.beginPath();
       ctx.arc(head.x, head.y, thickness + 6, 0, Math.PI*2);
       ctx.fillStyle = "rgba(255,120,0,0.5)";
       ctx.fill();
     }
+
+    // ===== OLHOS CORRETOS =====
+    const eyeOffset = thickness * 0.6;
+    const forward = thickness * 0.4;
+
+    const ex = Math.cos(head.angle);
+    const ey = Math.sin(head.angle);
+
+    const px = -ey;
+    const py = ex;
+
+    let leftX = head.x + px * eyeOffset + ex * forward;
+    let leftY = head.y + py * eyeOffset + ey * forward;
+
+    let rightX = head.x - px * eyeOffset + ex * forward;
+    let rightY = head.y - py * eyeOffset + ey * forward;
+
+    ctx.fillStyle="white";
+    ctx.beginPath();
+    ctx.arc(leftX, leftY, thickness*0.25, 0, Math.PI*2);
+    ctx.arc(rightX, rightY, thickness*0.25, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle="black";
+    ctx.beginPath();
+    ctx.arc(leftX, leftY, thickness*0.12, 0, Math.PI*2);
+    ctx.arc(rightX, rightY, thickness*0.12, 0, Math.PI*2);
+    ctx.fill();
   }
 
   ctx.restore();
-
-  // ===== OLHOS CENTRALIZADOS =====
-  const cx = canvas.width/2;
-  const cy = canvas.height/2;
-
-  ctx.fillStyle="white";
-  ctx.beginPath();
-  ctx.arc(cx-6, cy-4, 3,0,Math.PI*2);
-  ctx.arc(cx+6, cy-4, 3,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.fillStyle="black";
-  ctx.beginPath();
-  ctx.arc(cx-6, cy-4, 1.5,0,Math.PI*2);
-  ctx.arc(cx+6, cy-4, 1.5,0,Math.PI*2);
-  ctx.fill();
 
   // UI
   ctx.fillStyle="white";
