@@ -4,50 +4,67 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*"
+  }
+});
 
-// Servir arquivos
+// SERVIR ARQUIVOS
 app.use(express.static(__dirname));
 
-// 👇 GARANTE QUE O INDEX ABRA
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
 
-// Jogadores
+// ===== PLAYERS =====
 let players = {};
 
+function randomPos() {
+  return (Math.random() - 0.5) * 2000;
+}
+
+// ===== CONEXÃO =====
 io.on("connection", (socket) => {
-  console.log("Jogador conectado:", socket.id);
+  console.log("Player conectado:", socket.id);
 
   players[socket.id] = {
-    x: Math.random() * 500,
-    y: Math.random() * 500
+    id: socket.id,
+    x: randomPos(),
+    y: randomPos(),
+    angle: 0,
+    size: 30
   };
 
-  socket.emit("currentPlayers", players);
+  // envia estado completo ao entrar
+  socket.emit("init", players);
 
-  socket.broadcast.emit("newPlayer", {
-    id: socket.id,
-    ...players[socket.id]
-  });
+  socket.on("update", (data) => {
+    if (!players[socket.id]) return;
 
-  socket.on("move", (data) => {
-    players[socket.id] = data;
-
-    socket.broadcast.emit("playerMoved", {
-      id: socket.id,
-      ...data
-    });
+    players[socket.id] = {
+      ...players[socket.id],
+      x: data.x,
+      y: data.y,
+      angle: data.angle,
+      size: data.size
+    };
   });
 
   socket.on("disconnect", () => {
+    console.log("Saiu:", socket.id);
     delete players[socket.id];
-    io.emit("playerDisconnected", socket.id);
   });
 });
 
+// ===== LOOP GLOBAL (MULTIPLAYER REAL) =====
+setInterval(() => {
+  io.emit("state", players);
+}, 50); // 20 FPS
+
+// ===== START =====
 const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, () => {
   console.log("Servidor rodando na porta", PORT);
 });
