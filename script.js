@@ -1,9 +1,178 @@
-// ===== COBRA =====
-if (snake.length > 2) {
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-  let thickness = 5 + (maxLength / 80); // corpo mais fino
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-  // ===== CORPO =====
+// ===== SOCKET =====
+const socket = io();
+let otherPlayers = {};
+
+// ===== CONFIG =====
+const SPEED = 2.0;
+const BOOST_SPEED = 3.8;
+const TURN_SPEED = 0.08;
+
+const MAP_SIZE = 2200;
+
+let safeRadius = MAP_SIZE / 2;
+const MIN_SAFE = 180;
+const SAFE_SPEED = 0.15;
+
+let shrinking = true;
+
+// ===== PLAYER =====
+let snake = [];
+let maxLength = 40;
+
+let head = { x: 0, y: 0, angle: 0 };
+let target = { x: 0, y: 0 };
+
+let boosting = false;
+let lastTap = 0;
+
+// ===== CAMERA =====
+let cam = { x: 0, y: 0 };
+
+// ===== FOODS =====
+let foods = [];
+
+for (let i = 0; i < 160; i++) {
+  foods.push({
+    x: (Math.random() - 0.5) * MAP_SIZE,
+    y: (Math.random() - 0.5) * MAP_SIZE
+  });
+}
+
+// ===== SOCKET EVENTS =====
+socket.on("init", (data) => {
+  otherPlayers = data;
+});
+
+socket.on("state", (data) => {
+  otherPlayers = data;
+});
+
+// ===== CONTROLES =====
+document.addEventListener("touchstart", () => {
+  let now = Date.now();
+  if (now - lastTap < 250) boosting = true;
+  lastTap = now;
+});
+
+document.addEventListener("touchend", () => boosting = false);
+
+document.addEventListener("touchmove", (e) => {
+  const t = e.touches[0];
+  target.x = t.clientX - canvas.width/2;
+  target.y = t.clientY - canvas.height/2;
+}, { passive: true });
+
+document.addEventListener("mousemove", (e) => {
+  target.x = e.clientX - canvas.width/2;
+  target.y = e.clientY - canvas.height/2;
+});
+
+// ===== UPDATE =====
+function update() {
+
+  let targetAngle = Math.atan2(target.y, target.x);
+  let diff = targetAngle - head.angle;
+
+  if (diff > Math.PI) diff -= Math.PI*2;
+  if (diff < -Math.PI) diff += Math.PI*2;
+
+  head.angle += diff * TURN_SPEED;
+
+  let canBoost = maxLength > 25;
+  let currentSpeed = (boosting && canBoost) ? BOOST_SPEED : SPEED;
+
+  head.x += Math.cos(head.angle) * currentSpeed;
+  head.y += Math.sin(head.angle) * currentSpeed;
+
+  if (boosting && canBoost) {
+    maxLength -= 0.25;
+  }
+
+  if (!snake[0] || Math.hypot(head.x - snake[0].x, head.y - snake[0].y) > 4) {
+    snake.unshift({ x: head.x, y: head.y });
+  }
+
+  while (snake.length > maxLength) snake.pop();
+
+  // enviar pro servidor
+  socket.emit("update", {
+    x: head.x,
+    y: head.y,
+    angle: head.angle,
+    size: maxLength
+  });
+
+  cam.x += (head.x - cam.x) * 0.1;
+  cam.y += (head.y - cam.y) * 0.1;
+}
+
+// ===== DRAW =====
+function draw() {
+
+  ctx.fillStyle = "#0a0a0a";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  update();
+
+  ctx.save();
+
+  ctx.translate(
+    canvas.width/2 - cam.x,
+    canvas.height/2 - cam.y
+  );
+
+  // ===== SAFE ZONE =====
+  ctx.beginPath();
+  ctx.arc(0,0,safeRadius,0,Math.PI*2);
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "rgba(0,255,150,0.7)";
+  ctx.stroke();
+
+  // ===== FOODS =====
+  foods.forEach(f=>{
+    ctx.beginPath();
+    ctx.arc(f.x,f.y,6,0,Math.PI*2);
+    ctx.fillStyle="#ffd84d";
+    ctx.fill();
+  });
+
+  // ===== SUA COBRA =====
+  drawSnake(head, snake, maxLength, "#00c97a");
+
+  // ===== OUTROS PLAYERS =====
+  for (let id in otherPlayers) {
+
+    if (id === socket.id) continue;
+
+    let p = otherPlayers[id];
+
+    if (!p) continue;
+
+    // cabeça simples (depois melhoramos)
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = "red";
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  requestAnimationFrame(draw);
+}
+
+// ===== DESENHO DA COBRA =====
+function drawSnake(head, snake, size, color) {
+
+  if (snake.length < 2) return;
+
+  let thickness = 10 + (size / 80);
+
   ctx.beginPath();
   ctx.moveTo(snake[0].x, snake[0].y);
 
@@ -16,67 +185,41 @@ if (snake.length > 2) {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  ctx.lineWidth = thickness;
-  ctx.strokeStyle = "#00c97a";
+  ctx.lineWidth = thickness + 4;
+  ctx.strokeStyle = "#6affd2";
   ctx.stroke();
 
-  // ===== CABEÇA (SEPARADA) =====
-  const headRadius = thickness * 1.4;
+  ctx.lineWidth = thickness;
+  ctx.strokeStyle = color;
+  ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(head.x, head.y, headRadius, 0, Math.PI * 2);
-
-  // leve brilho
-  const grad = ctx.createRadialGradient(
-    head.x - headRadius/3,
-    head.y - headRadius/3,
-    2,
-    head.x,
-    head.y,
-    headRadius
-  );
-
-  grad.addColorStop(0, "#6affd2");
-  grad.addColorStop(1, "#00c97a");
-
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // ===== BOOST (PONTA ARDENDO) =====
-  if (boosting && maxLength > 20) {
-    ctx.beginPath();
-    ctx.arc(head.x, head.y, headRadius + 4, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255,120,0,0.4)";
-    ctx.fill();
-  }
-
-  // ===== OLHOS NA CABEÇA =====
+  // OLHOS
   const ex = Math.cos(head.angle);
   const ey = Math.sin(head.angle);
 
   const px = -ey;
   const py = ex;
 
-  const eyeDist = headRadius * 0.5;
-  const forward = headRadius * 0.3;
+  const eyeDist = thickness * 0.4;
+  const forward = thickness * 0.2;
 
-  let leftX = head.x + px * eyeDist + ex * forward;
-  let leftY = head.y + py * eyeDist + ey * forward;
+  const leftX = head.x + px * eyeDist + ex * forward;
+  const leftY = head.y + py * eyeDist + ey * forward;
 
-  let rightX = head.x - px * eyeDist + ex * forward;
-  let rightY = head.y - py * eyeDist + ey * forward;
+  const rightX = head.x - px * eyeDist + ex * forward;
+  const rightY = head.y - py * eyeDist + ey * forward;
 
-  // branco
   ctx.fillStyle = "white";
   ctx.beginPath();
-  ctx.arc(leftX, leftY, headRadius * 0.25, 0, Math.PI * 2);
-  ctx.arc(rightX, rightY, headRadius * 0.25, 0, Math.PI * 2);
+  ctx.arc(leftX, leftY, thickness * 0.3, 0, Math.PI * 2);
+  ctx.arc(rightX, rightY, thickness * 0.3, 0, Math.PI * 2);
   ctx.fill();
 
-  // pupila
   ctx.fillStyle = "black";
   ctx.beginPath();
-  ctx.arc(leftX, leftY, headRadius * 0.12, 0, Math.PI * 2);
-  ctx.arc(rightX, rightY, headRadius * 0.12, 0, Math.PI * 2);
+  ctx.arc(leftX, leftY, thickness * 0.15, 0, Math.PI * 2);
+  ctx.arc(rightX, rightY, thickness * 0.15, 0, Math.PI * 2);
   ctx.fill();
 }
+
+draw();
