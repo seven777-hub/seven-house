@@ -4,39 +4,33 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
-  cors: {
-    origin: "*"
-  }
+  cors: { origin: "*" }
 });
 
-// SERVIR ARQUIVOS
 app.use(express.static(__dirname));
 
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
 
-// ===== PLAYERS =====
 let players = {};
 
 function randomPos() {
   return (Math.random() - 0.5) * 2000;
 }
 
-// ===== CONEXÃO =====
 io.on("connection", (socket) => {
-  console.log("Player conectado:", socket.id);
 
   players[socket.id] = {
     id: socket.id,
     x: randomPos(),
     y: randomPos(),
     angle: 0,
-    size: 30
+    size: 40
   };
 
-  // envia estado completo ao entrar
   socket.emit("init", players);
 
   socket.on("update", (data) => {
@@ -52,17 +46,15 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("Saiu:", socket.id);
     delete players[socket.id];
   });
 });
 
-// ===== LOOP GLOBAL (MULTIPLAYER REAL) =====
+// LOOP GLOBAL
 setInterval(() => {
   io.emit("state", players);
-}, 50); // 20 FPS
+}, 50);
 
-// ===== START =====
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
