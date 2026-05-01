@@ -4,24 +4,17 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ===== SOCKET =====
+// SOCKET
 const socket = io();
 let otherPlayers = {};
 
-// ===== CONFIG =====
-const SPEED = 2.0;
-const BOOST_SPEED = 3.8;
+// CONFIG
+const SPEED = 2.2;
+const BOOST_SPEED = 4.0;
 const TURN_SPEED = 0.08;
 
 const MAP_SIZE = 2200;
 
-let safeRadius = MAP_SIZE / 2;
-const MIN_SAFE = 180;
-const SAFE_SPEED = 0.15;
-
-let shrinking = true;
-
-// ===== PLAYER =====
 let snake = [];
 let maxLength = 40;
 
@@ -31,29 +24,9 @@ let target = { x: 0, y: 0 };
 let boosting = false;
 let lastTap = 0;
 
-// ===== CAMERA =====
 let cam = { x: 0, y: 0 };
 
-// ===== FOODS =====
-let foods = [];
-
-for (let i = 0; i < 160; i++) {
-  foods.push({
-    x: (Math.random() - 0.5) * MAP_SIZE,
-    y: (Math.random() - 0.5) * MAP_SIZE
-  });
-}
-
-// ===== SOCKET EVENTS =====
-socket.on("init", (data) => {
-  otherPlayers = data;
-});
-
-socket.on("state", (data) => {
-  otherPlayers = data;
-});
-
-// ===== CONTROLES =====
+// CONTROLES
 document.addEventListener("touchstart", () => {
   let now = Date.now();
   if (now - lastTap < 250) boosting = true;
@@ -73,7 +46,16 @@ document.addEventListener("mousemove", (e) => {
   target.y = e.clientY - canvas.height/2;
 });
 
-// ===== UPDATE =====
+// SOCKET
+socket.on("init", (data) => {
+  otherPlayers = data;
+});
+
+socket.on("state", (data) => {
+  otherPlayers = data;
+});
+
+// UPDATE
 function update() {
 
   let targetAngle = Math.atan2(target.y, target.x);
@@ -85,13 +67,13 @@ function update() {
   head.angle += diff * TURN_SPEED;
 
   let canBoost = maxLength > 25;
-  let currentSpeed = (boosting && canBoost) ? BOOST_SPEED : SPEED;
+  let speed = (boosting && canBoost) ? BOOST_SPEED : SPEED;
 
-  head.x += Math.cos(head.angle) * currentSpeed;
-  head.y += Math.sin(head.angle) * currentSpeed;
+  head.x += Math.cos(head.angle) * speed;
+  head.y += Math.sin(head.angle) * speed;
 
   if (boosting && canBoost) {
-    maxLength -= 0.25;
+    maxLength -= 0.2;
   }
 
   if (!snake[0] || Math.hypot(head.x - snake[0].x, head.y - snake[0].y) > 4) {
@@ -100,7 +82,6 @@ function update() {
 
   while (snake.length > maxLength) snake.pop();
 
-  // enviar pro servidor
   socket.emit("update", {
     x: head.x,
     y: head.y,
@@ -112,7 +93,7 @@ function update() {
   cam.y += (head.y - cam.y) * 0.1;
 }
 
-// ===== DRAW =====
+// DRAW
 function draw() {
 
   ctx.fillStyle = "#0a0a0a";
@@ -121,40 +102,17 @@ function draw() {
   update();
 
   ctx.save();
+  ctx.translate(canvas.width/2 - cam.x, canvas.height/2 - cam.y);
 
-  ctx.translate(
-    canvas.width/2 - cam.x,
-    canvas.height/2 - cam.y
-  );
-
-  // ===== SAFE ZONE =====
-  ctx.beginPath();
-  ctx.arc(0,0,safeRadius,0,Math.PI*2);
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = "rgba(0,255,150,0.7)";
-  ctx.stroke();
-
-  // ===== FOODS =====
-  foods.forEach(f=>{
-    ctx.beginPath();
-    ctx.arc(f.x,f.y,6,0,Math.PI*2);
-    ctx.fillStyle="#ffd84d";
-    ctx.fill();
-  });
-
-  // ===== SUA COBRA =====
   drawSnake(head, snake, maxLength, "#00c97a");
 
-  // ===== OUTROS PLAYERS =====
+  // OUTROS PLAYERS
   for (let id in otherPlayers) {
 
     if (id === socket.id) continue;
 
     let p = otherPlayers[id];
 
-    if (!p) continue;
-
-    // cabeça simples (depois melhoramos)
     ctx.beginPath();
     ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
     ctx.fillStyle = "red";
@@ -166,7 +124,7 @@ function draw() {
   requestAnimationFrame(draw);
 }
 
-// ===== DESENHO DA COBRA =====
+// DESENHO
 function drawSnake(head, snake, size, color) {
 
   if (snake.length < 2) return;
@@ -193,7 +151,6 @@ function drawSnake(head, snake, size, color) {
   ctx.strokeStyle = color;
   ctx.stroke();
 
-  // OLHOS
   const ex = Math.cos(head.angle);
   const ey = Math.sin(head.angle);
 
