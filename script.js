@@ -13,8 +13,6 @@ const SPEED = 2.2;
 const BOOST_SPEED = 4.0;
 const TURN_SPEED = 0.08;
 
-const MAP_SIZE = 2200;
-
 let snake = [];
 let maxLength = 40;
 
@@ -26,7 +24,7 @@ let lastTap = 0;
 
 let cam = { x: 0, y: 0 };
 
-// CONTROLES
+// CONTROLES MOBILE
 document.addEventListener("touchstart", () => {
   let now = Date.now();
   if (now - lastTap < 250) boosting = true;
@@ -37,20 +35,33 @@ document.addEventListener("touchend", () => boosting = false);
 
 document.addEventListener("touchmove", (e) => {
   const t = e.touches[0];
-  target.x = t.clientX - canvas.width/2;
-  target.y = t.clientY - canvas.height/2;
+  target.x = t.clientX - canvas.width / 2;
+  target.y = t.clientY - canvas.height / 2;
 }, { passive: true });
 
+// CONTROLES PC
 document.addEventListener("mousemove", (e) => {
-  target.x = e.clientX - canvas.width/2;
-  target.y = e.clientY - canvas.height/2;
+  target.x = e.clientX - canvas.width / 2;
+  target.y = e.clientY - canvas.height / 2;
 });
 
-// SOCKET
+// SOCKET INIT
 socket.on("init", (data) => {
   otherPlayers = data;
+
+  if (data[socket.id]) {
+    head.x = data[socket.id].x;
+    head.y = data[socket.id].y;
+    maxLength = data[socket.id].size || 40;
+
+    snake = [];
+    for (let i = 0; i < maxLength; i++) {
+      snake.push({ x: head.x, y: head.y });
+    }
+  }
 });
 
+// SOCKET UPDATE GLOBAL
 socket.on("state", (data) => {
   otherPlayers = data;
 });
@@ -61,8 +72,8 @@ function update() {
   let targetAngle = Math.atan2(target.y, target.x);
   let diff = targetAngle - head.angle;
 
-  if (diff > Math.PI) diff -= Math.PI*2;
-  if (diff < -Math.PI) diff += Math.PI*2;
+  if (diff > Math.PI) diff -= Math.PI * 2;
+  if (diff < -Math.PI) diff += Math.PI * 2;
 
   head.angle += diff * TURN_SPEED;
 
@@ -97,12 +108,12 @@ function update() {
 function draw() {
 
   ctx.fillStyle = "#0a0a0a";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   update();
 
   ctx.save();
-  ctx.translate(canvas.width/2 - cam.x, canvas.height/2 - cam.y);
+  ctx.translate(canvas.width / 2 - cam.x, canvas.height / 2 - cam.y);
 
   drawSnake(head, snake, maxLength, "#00c97a");
 
@@ -124,9 +135,10 @@ function draw() {
   requestAnimationFrame(draw);
 }
 
-// DESENHO
+// DESENHO DA COBRA
 function drawSnake(head, snake, size, color) {
 
+  if (!snake.length) return;
   if (snake.length < 2) return;
 
   let thickness = 10 + (size / 80);
@@ -135,8 +147,8 @@ function drawSnake(head, snake, size, color) {
   ctx.moveTo(snake[0].x, snake[0].y);
 
   for (let i = 1; i < snake.length - 2; i++) {
-    const xc = (snake[i].x + snake[i+1].x) / 2;
-    const yc = (snake[i].y + snake[i+1].y) / 2;
+    const xc = (snake[i].x + snake[i + 1].x) / 2;
+    const yc = (snake[i].y + snake[i + 1].y) / 2;
     ctx.quadraticCurveTo(snake[i].x, snake[i].y, xc, yc);
   }
 
