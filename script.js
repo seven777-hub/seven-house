@@ -7,6 +7,7 @@ canvas.height = window.innerHeight;
 // SOCKET
 const socket = io();
 let otherPlayers = {};
+let started = false;
 
 // CONFIG
 const SPEED = 2.2;
@@ -24,7 +25,7 @@ let lastTap = 0;
 
 let cam = { x: 0, y: 0 };
 
-// CONTROLES MOBILE
+// CONTROLES
 document.addEventListener("touchstart", () => {
   let now = Date.now();
   if (now - lastTap < 250) boosting = true;
@@ -39,13 +40,12 @@ document.addEventListener("touchmove", (e) => {
   target.y = t.clientY - canvas.height / 2;
 }, { passive: true });
 
-// CONTROLES PC
 document.addEventListener("mousemove", (e) => {
   target.x = e.clientX - canvas.width / 2;
   target.y = e.clientY - canvas.height / 2;
 });
 
-// SOCKET INIT
+// 🔥 INIT (CORRIGIDO)
 socket.on("init", (data) => {
   otherPlayers = data;
 
@@ -58,16 +58,18 @@ socket.on("init", (data) => {
     for (let i = 0; i < maxLength; i++) {
       snake.push({ x: head.x, y: head.y });
     }
+
+    started = true; // ✅ só começa depois disso
   }
 });
 
-// SOCKET UPDATE GLOBAL
 socket.on("state", (data) => {
   otherPlayers = data;
 });
 
 // UPDATE
 function update() {
+  if (!started) return; // 🚨 trava até receber dados
 
   let targetAngle = Math.atan2(target.y, target.x);
   let diff = targetAngle - head.angle;
@@ -106,9 +108,16 @@ function update() {
 
 // DRAW
 function draw() {
-
   ctx.fillStyle = "#0a0a0a";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (!started) {
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+    ctx.fillText("Conectando...", 20, 40);
+    requestAnimationFrame(draw);
+    return;
+  }
 
   update();
 
@@ -119,7 +128,6 @@ function draw() {
 
   // OUTROS PLAYERS
   for (let id in otherPlayers) {
-
     if (id === socket.id) continue;
 
     let p = otherPlayers[id];
@@ -135,11 +143,9 @@ function draw() {
   requestAnimationFrame(draw);
 }
 
-// DESENHO DA COBRA
+// DESENHO
 function drawSnake(head, snake, size, color) {
-
-  if (!snake.length) return;
-  if (snake.length < 2) return;
+  if (!snake.length || snake.length < 2) return;
 
   let thickness = 10 + (size / 80);
 
