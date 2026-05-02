@@ -1,13 +1,22 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
+  <meta charset="UTF-8">
   <title>Snake Multiplayer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
-    body {
+    * {
       margin: 0;
-      overflow: hidden;
-      background: #111;
+      padding: 0;
+      box-sizing: border-box;
     }
+
+    body {
+      background: #111;
+      overflow: hidden;
+    }
+
     canvas {
       display: block;
     }
@@ -17,7 +26,10 @@
 
 <canvas id="game"></canvas>
 
+<!-- IMPORTANTE: isso aqui faz o multiplayer funcionar -->
 <script src="/socket.io/socket.io.js"></script>
+
+<!-- Seu código do jogo -->
 <script src="script.js"></script>
 
 </body>
