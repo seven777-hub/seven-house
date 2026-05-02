@@ -5,12 +5,17 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
+// 🔥 IMPORTANTE: cria o socket corretamente
 const io = new Server(server, {
-  cors: { origin: "*" }
+  cors: {
+    origin: "*"
+  }
 });
 
+// 🔥 SERVIR ARQUIVOS
 app.use(express.static(__dirname));
 
+// 🔥 GARANTE QUE INDEX ABRE
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
@@ -21,7 +26,9 @@ function randomPos() {
   return (Math.random() - 0.5) * 2000;
 }
 
+// 🔥 CONEXÃO
 io.on("connection", (socket) => {
+  console.log("Jogador conectado:", socket.id);
 
   players[socket.id] = {
     id: socket.id,
@@ -46,17 +53,19 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    console.log("Saiu:", socket.id);
     delete players[socket.id];
   });
 });
 
-// LOOP GLOBAL
+// 🔥 LOOP GLOBAL
 setInterval(() => {
   io.emit("state", players);
 }, 50);
 
+// 🔥 PORTA CORRETA (Railway)
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log("Servidor rodando na porta", PORT);
+  console.log("Rodando na porta", PORT);
 });
